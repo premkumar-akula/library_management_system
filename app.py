@@ -12,6 +12,16 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-12345')
 
+# Use local MongoDB for development, Atlas for production
+if os.environ.get('VERCEL') or os.environ.get('PRODUCTION'):
+    # Production (Vercel) - Use MongoDB Atlas
+    MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/library_management')
+else:
+    # Development - Use local MongoDB
+    MONGODB_URI = 'mongodb://localhost:27017/library_management'
+
+client = MongoClient(MONGODB_URI)
+db = client.library_management
 # MongoDB Configuration
 try:
     MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/library_management')
@@ -185,3 +195,4 @@ def logout():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+

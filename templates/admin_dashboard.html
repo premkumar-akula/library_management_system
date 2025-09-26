@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .footer{
+        position: fixed;
+    }
+</style>
+<div class="dashboard-header">
+    <h2>Admin Dashboard</h2>
+    <p>Welcome back, {{ session['name'] }}!</p>
+</div>
+
+<div class="row mt-8 ">
+    <div class="col-md-6 ">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Manage Books</h5>
+                <p class="card-text">Add, edit, or remove books from the library.</p>
+                <a href="/admin/books" class="btn btn-outline-primary">Book Management</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">User Management</h5>
+                <p class="card-text">View and manage library users.</p>
+                <a href="/user/books" class="btn btn-outline-primary">Manage Users</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}

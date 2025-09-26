@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Library - Available Books</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+    .footer {
+            position: relative;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #2c3e50;
+            padding: 10px 0;
+            z-index: 1000;
+        }
+        
+        /* Adjust main content to prevent footer overlap */
+        .main-content {
+            padding-bottom: 50px;
+        }
+        
+        .footer a {
+            transition: all 0.3s ease;
+        }
+        
+        .footer a:hover {
+            color: var(--bs-primary) !important;
+            text-decoration: underline;
+        }
+        
+        .footer .bi {
+            font-size: 1.1em;
+            vertical-align: middle;
+        }
+</style>
+</head>
+<body class="bg-light">
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand" href="{{ url_for('index') }}">Library Management System</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link active" href="/user/books">Books</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('user_support') }}">
+        <i class="bi bi-headset me-1"></i>Support </a></li>
+        <li class="nav-item"><a class="nav-link active" href="{{ url_for('logout') }}">Logout</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container mt-4">
+    <h2 class="text-center mb-4">Available Books</h2>
+
+    <!-- Search and Category Filter -->
+    <form class="d-flex mb-4 gap-2" method="GET" action=" ">
+        <input class="form-control me-2" type="text" name="q" placeholder="Search by title" value="{{ query }}">
+        <select name="category" class="form-select w-25">
+            <option value="">All Categories</option>
+            {% for cat in categories %}
+                <option value="{{ cat }}" {% if cat == request.args.get('category') %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn btn-outline-primary" type="submit">Search</button>
+    </form>
+
+    <!-- Book Cards -->
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        {% for book in books %}
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <img src="{{ book['image'] if book['image'] else 'https://via.placeholder.com/150x200?text=No+Image' }}" class="card-img-top" alt="Book Image" style="height: 250px; width: 100%; ">
+                <div class="card-body">
+                    <h5 class="card-title">{{ book['title'] }}</h5>
+                    <p class="card-text"><strong>Author:</strong> {{ book['author'] }}</p>
+                    <p class="card-text"><strong>Category:</strong> {{ book['type'] }}</p>
+                    <p class="card-text"><strong>Price:</strong> ₹{{ book['price'] }}</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if books|length == 0 %}
+    <div class="alert alert-warning text-center mt-4">No books found matching your search.</div>
+    {% endif %}
+</div>
+<!-- footer -->
+   <footer class="fixed-footer footer mt-5 py-3 bg-dark text-white p-3 text-center">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-auto">
+                    <span>&copy; 2025 Library Management System <br> Developed by 
+                        <a href="https://github.com/premkumar-akula" target="_blank" class="text-decoration-none text-info" data-bs-toggle="tooltip" title="GitHub">
+                            <i class="bi bi-github">Akula Prem Kumar</i>
+                        
+                        <a href="https://www.linkedin.com/in/prem-kumar-akula-98a01829a?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app" target="_blank" class="text-decoration-none text-info ms-1">
+                            <i class="bi bi-linkedin"></i>
+                        </a>
+                        & 
+                        <a href="https://github.com/Gadi-Satwika" target="_blank" class="text-decoration-none text-info">
+                            <i class="bi bi-github">Gadi Satwika</i> 
+                        </a>
+                        <a href="https://www.linkedin.com/in/gadi-satwika-075414305?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app&lipi=urn%3Ali%3Apage%3Ad_flagship3_messaging_conversation_detail%3B3QkuggYvRIWxWE8LfmBknQ%3D%3D" target="_blank" class="text-decoration-none text-info ms-1">
+                            <i class="bi bi-linkedin"></i>
+                        </a>
+                    </span>
+                </div>  
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
+

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+    .footer{
+        position: relative;
+    }
+</style>
+</head> 
+<body >
+    
+       
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">Library Management System</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                            <ul class="navbar-nav ms-auto">
+                {% if 'user_id' in session %}
+                    <li class="nav-item">
+                        <span class="nav-link">Welcome, {{ session['name'] }}</span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+                    </li>
+                {% else %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="loginDropdown" role="button" data-bs-toggle="dropdown">
+                            Login
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="loginDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('user_login') }}">User Login</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_login') }}">Admin Login</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="registerDropdown" role="button" data-bs-toggle="dropdown">
+                            Register
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="registerDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('user_signup') }}">User Signup</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_signup') }}">Admin Signup</a></li>
+                        </ul>
+                    </li>
+                {% endif %}
+            </ul>
+            </div>
+        </div>
+    </nav>
+     
+    <div class="container mt-4 ">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+    <!-- footer -->
+   <footer class="fixed-footer footer mt-5 py-3 bg-dark text-white p-3 text-center">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-auto">
+                    <span>&copy; 2025 Library Management System <br> Developed by 
+                        <a href="https://github.com/premkumar-akula" target="_blank" class="text-decoration-none text-info" data-bs-toggle="tooltip" title="GitHub">
+                            <i class="bi bi-github">Akula Prem Kumar</i>
+                        
+                        <a href="https://www.linkedin.com/in/prem-kumar-akula-98a01829a?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app" target="_blank" class="text-decoration-none text-info ms-1">
+                            <i class="bi bi-linkedin"></i>
+                        </a>
+                        & 
+                        <a href="https://github.com/Gadi-Satwika" target="_blank" class="text-decoration-none text-info">
+                            <i class="bi bi-github">Gadi Satwika</i> 
+                        </a>
+                        <a href="https://www.linkedin.com/in/gadi-satwika-075414305?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app&lipi=urn%3Ali%3Apage%3Ad_flagship3_messaging_conversation_detail%3B3QkuggYvRIWxWE8LfmBknQ%3D%3D" target="_blank" class="text-decoration-none text-info ms-1">
+                            <i class="bi bi-linkedin"></i>
+                        </a>
+                    </span>
+                </div>  
+            </div>
+        </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+</body>
+</html> 

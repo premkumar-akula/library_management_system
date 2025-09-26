@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero-section text-center py-5 bg-light">
+    <h1 class="display-4">Welcome to Our Library</h1>
+    <p class="lead">Manage and explore books with ease</p>
+    <div class="mt-4">
+        <a href="{{ url_for('user_login') }}" class="btn btn-primary btn-lg mx-2">Login</a>
+        <a href="{{ url_for('user_signup') }}" class="btn btn-primary btn-lg mx-2">Sign Up</a>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-5 row mt-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">For Users</h5>
+                <p> 📚 View all available books<br>
+                    🔍 Search & filter books by category
+                </p>
+                <p class="card-text">Browse books, check availability, and manage your account.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">For Admins</h5>
+                <p>📖 Add, edit, and delete books<br>
+                📋 View borrowed books<br>
+                ✏ Edit or delete borrowed book entries<br>
+                🔍 Search books by title, author, or student details<br>
+                🗂 Filter books by category
+                </p>
+                <p class="card-text">Manage books, users, and library operations. Full system control and administration.</p>
+                <!-- <p class="card-text">Full system control and administration.</p> -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

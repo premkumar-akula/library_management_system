@@ -1,79 +1,59 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session,jsonify
-from flask_pymongo import PyMongo
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 from datetime import datetime, timedelta
 import secrets
-import re
-from dotenv import load_dotenv
-from pathlib import Path
-from pymongo import MongoClient
 from bson.objectid import ObjectId
-from datetime import datetime, timezone
-from pymongo import MongoClient
-from bson.objectid import ObjectId
-import json
 
-
-
-# Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key')
-load_dotenv()
-
-# Configuration
-app.secret_key = os.getenv('SECRET_KEY')
-app.config['MONGO_URI'] = os.getenv('MONGO_URI')
-
-# Initialize extensions
-mongo = PyMongo(app)
-
-# MongoDB setup
-client = MongoClient("mongodb://localhost:27017/")
-db = client['library_db']
-books_col = db.books
-borrowed_books_col = db.borrowed_books
-books_collection = db['books']
-borrowed_books_col = db['borrowed_books']
-
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-12345')
 
 # MongoDB Configuration
 MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/library_management')
 client = MongoClient(MONGODB_URI)
 db = client.get_database()
 
-# No need for a separate class, we'll use MongoDB collections directly
-# But you can create a helper function for structure:
+# Collections
+books_collection = db.books
+users_collection = db.users
+borrowed_books_collection = db.borrowed_books
+tickets_collection = db.tickets
+password_resets_collection = db.password_resets
 
-def create_support_ticket(user_id, message):
-    """Helper function to create a ticket structure"""
-    return {
-        'user_id': ObjectId(user_id),  # Convert to ObjectId if storing references
-        'message': message,
-        'response': None,
-        'created_at': datetime.utcnow(),
-        'status': 'open',
-        'user_info': {  # You can denormalize some user data for easier queries
-            'name': None,  # Will be populated when creating ticket
-            'email': None
-        }
-    }
+# Initialize collections with sample data if empty
+def initialize_database():
+    try:
+        if books_collection.count_documents({}) == 0:
+            sample_books = [
+                {'title': 'Sample Book 1', 'author': 'Author 1', 'type': 'Fiction', 'price': 29.99, 'image': '/static/images/book1.jpg'},
+                {'title': 'Sample Book 2', 'author': 'Author 2', 'type': 'Science', 'price': 39.99, 'image': '/static/images/book2.jpg'}
+            ]
+            books_collection.insert_many(sample_books)
+            print("Database initialized with sample data")
+    except Exception as e:
+        print(f"Database initialization error: {e}")
+
+# Initialize database on app startup
+initialize_database()
+
 # Routes
 @app.route('/')
 def index():
     return render_template('index.html')
 
+# ===== PASSWORD RESET ROUTES =====
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
         email = request.form.get('email')
-        user = mongo.db.users.find_one({'email': email})
+        user = users_collection.find_one({'email': email})
         
         if user:
             token = secrets.token_urlsafe(32)
-            expiry = datetime.now() + timedelta(hours=1)
+            expiry = datetime.utcnow() + timedelta(hours=1)
             
-            mongo.db.password_resets.insert_one({
+            password_resets_collection.insert_one({
                 'email': email,
                 'token': token,
                 'expires_at': expiry
@@ -90,9 +70,9 @@ def forgot_password():
 
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
-    reset_request = mongo.db.password_resets.find_one({
+    reset_request = password_resets_collection.find_one({
         'token': token,
-        'expires_at': {'$gt': datetime.now()}
+        'expires_at': {'$gt': datetime.utcnow()}
     })
     
     if not reset_request:
@@ -107,20 +87,19 @@ def reset_password(token):
             flash('Passwords do not match', 'danger')
             return redirect(request.url)
         
-        mongo.db.users.update_one(
+        users_collection.update_one(
             {'email': reset_request['email']},
             {'$set': {'password': generate_password_hash(password)}}
         )
         
-        mongo.db.password_resets.delete_one({'token': token})
+        password_resets_collection.delete_one({'token': token})
         
         flash('Password updated successfully! Please login.', 'success')
         return redirect(url_for('user_login'))
     
     return render_template('reset_password.html', token=token)
 
-# Remove the combined login route and keep these separate routes:
-
+# ===== LOGIN ROUTES =====
 @app.route('/user/login', methods=['GET', 'POST'])
 def user_login():
     if request.method == 'POST':
@@ -131,7 +110,7 @@ def user_login():
             flash('Please fill in all fields', 'danger')
             return redirect(url_for('user_login'))
         
-        user = mongo.db.users.find_one({'email': email, 'role': 'user'})
+        user = users_collection.find_one({'email': email, 'role': 'user'})
         
         if user and check_password_hash(user['password'], password):
             session['user_id'] = str(user['_id'])
@@ -143,8 +122,6 @@ def user_login():
     
     return render_template('user_login.html')
 
-
-
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
@@ -155,7 +132,7 @@ def admin_login():
             flash('Please fill in all fields', 'danger')
             return redirect(url_for('admin_login'))
         
-        admin = mongo.db.users.find_one({'email': email, 'role': 'admin'})
+        admin = users_collection.find_one({'email': email, 'role': 'admin'})
         
         if admin and check_password_hash(admin['password'], password):
             session['user_id'] = str(admin['_id'])
@@ -167,9 +144,7 @@ def admin_login():
     
     return render_template('admin_login.html')
 
-# User Signup Route
-# Keep only one definition like this:
-
+# ===== SIGNUP ROUTES =====
 @app.route('/user/signup', methods=['GET', 'POST'])
 def user_signup():
     if request.method == 'POST':
@@ -177,31 +152,28 @@ def user_signup():
         email = request.form.get('email')
         mobile = request.form.get('mobile')
         password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')  # New field
+        confirm_password = request.form.get('confirm_password')
         
-        # Validate passwords match
         if password != confirm_password:
             flash('Passwords do not match!', 'danger')
             return redirect(url_for('user_signup'))
             
-        # Rest of your validation
         if not all([full_name, email, mobile, password, confirm_password]):
             flash('Please fill in all fields', 'danger')
             return redirect(url_for('user_signup'))
         
-        existing_user = mongo.db.users.find_one({'$or': [{'email': email}, {'mobile': mobile}]})
+        existing_user = users_collection.find_one({'$or': [{'email': email}, {'mobile': mobile}]})
         if existing_user:
             flash('Email or mobile already registered', 'danger')
             return redirect(url_for('user_signup'))
         
-        # Create new user
-        mongo.db.users.insert_one({
+        users_collection.insert_one({
             'full_name': full_name,
             'email': email,
             'mobile': mobile,
             'password': generate_password_hash(password),
             'role': 'user',
-            'created_at': datetime.now()
+            'created_at': datetime.utcnow()
         })
         
         flash('Registration successful! Please login.', 'success')
@@ -216,32 +188,29 @@ def admin_signup():
         email = request.form.get('email')
         mobile = request.form.get('mobile')
         password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')  # New field
+        confirm_password = request.form.get('confirm_password')
         admin_key = request.form.get('admin_key')
         
-        # Validate passwords match
         if password != confirm_password:
             flash('Passwords do not match!', 'danger')
             return redirect(url_for('admin_signup'))
             
-        # Rest of your validation
         if not all([full_name, email, mobile, password, confirm_password, admin_key]):
             flash('Please fill in all fields', 'danger')
             return redirect(url_for('admin_signup'))
-                 # Check if admin already exists
-        existing_admin = mongo.db.users.find_one({'$or': [{'email': email}, {'mobile': mobile}]})
+        
+        existing_admin = users_collection.find_one({'$or': [{'email': email}, {'mobile': mobile}]})
         if existing_admin:
             flash('Email or mobile already registered', 'danger')
             return redirect(url_for('admin_signup'))
         
-        # Create new admin
-        mongo.db.users.insert_one({
+        users_collection.insert_one({
             'full_name': full_name,
             'email': email,
             'mobile': mobile,
             'password': generate_password_hash(password),
             'role': 'admin',
-            'created_at': datetime.now()
+            'created_at': datetime.utcnow()
         })
         
         flash('Admin registration successful! Please login.', 'success')
@@ -249,142 +218,20 @@ def admin_signup():
     
     return render_template('admin_signup.html')
 
+# ===== DASHBOARD ROUTES =====
 @app.route('/user/dashboard')
 def user_dashboard():
     if 'user_id' not in session or session['role'] != 'user':
-        return redirect(url_for('login'))
+        return redirect(url_for('user_login'))
     return render_template('user_dashboard.html')
 
 @app.route('/admin/dashboard')
 def admin_dashboard():
     if 'user_id' not in session or session['role'] != 'admin':
-        return redirect(url_for('login', type='admin'))
+        return redirect(url_for('admin_login'))
     return render_template('admin_dashboard.html')
 
-
-@app.route('/admin/books')
-def admin_books():
-    query = request.args.get('q', '')
-    selected_category = request.args.get('category', '')
-
-    # Fetch unique categories
-    categories = books_collection.distinct('type')
-
-    # Build filter based on query and category
-    filter_query = {}
-    if query:
-        filter_query['$or'] = [
-            {'title': {'$regex': query, '$options': 'i'}},
-            {'author': {'$regex': query, '$options': 'i'}}
-        ]
-    if selected_category:
-        filter_query['type'] = selected_category
-
-    books = list(books_collection.find(filter_query))
-    return render_template('books.html', books=books, categories=categories)
-
-@app.route('/admin/add-book', methods=['GET', 'POST'])
-def add_book():
-    if request.method == 'POST':
-        new_book = {
-            'title': request.form['title'],
-            'author': request.form['author'],
-            'type': request.form['type'],
-            'price': float(request.form['price']),
-            'image': request.form['image']
-        }
-        books_collection.insert_one(new_book)
-        return redirect(url_for('admin_books'))
-    return render_template('add_book.html')
-
-@app.route('/admin/edit-book/<book_id>', methods=['GET', 'POST'])
-def edit_book(book_id):
-    from bson.objectid import ObjectId
-    book = books_collection.find_one({'_id': ObjectId(book_id)})
-    if request.method == 'POST':
-        updated_book = {
-            'title': request.form['title'],
-            'author': request.form['author'],
-            'type': request.form['type'],
-            'price': float(request.form['price']),
-            'image': request.form['image']
-        }
-        books_collection.update_one({'_id': ObjectId(book_id)}, {'$set': updated_book})
-        return redirect(url_for('admin_books'))
-    return render_template('edit_book.html', book=book)
-
-@app.route('/admin/delete-book/<book_id>')
-def delete_book(book_id):
-    from bson.objectid import ObjectId
-    books_collection.delete_one({'_id': ObjectId(book_id)})
-    return redirect(url_for('admin_books'))
-
-@app.route('/admin/borrowed-books')
-def borrowed_books():
-    borrowed_books = list(borrowed_books_col.find())
-    return render_template('borrowed_books.html', borrowed_books=borrowed_books)
-
-
-@app.route("/admin/add-borrowed-book", methods=["GET", "POST"])
-def add_borrowed_book():
-    if request.method == "POST":
-        student_name = request.form['student_name']
-        student_id = request.form['student_id']
-        year = request.form['year']
-        book_title = request.form['book_title']
-        borrow_date = request.form['borrow_date']
-        status = request.form['status']
-
-        borrowed_books_col.insert_one({
-            "student_name": student_name,
-            "student_id": student_id,
-            "year": year,
-            "book_title": book_title,
-            "borrow_date": borrow_date,
-            "status": status 
-        })
-
-        return redirect("/admin/borrowed-books")
-
-    return render_template("add_borrowed_book.html")
-
-
-@app.route("/admin/edit-borrowed-book/<id>", methods=["GET", "POST"])
-def edit_borrowed_book(id):
-    entry = borrowed_books_col.find_one({"_id": ObjectId(id)})
-
-    if request.method == "POST":
-        updated_entry = {
-            "student_name": request.form['student_name'],
-            "student_id": request.form['student_id'],
-            "year": request.form['year'],
-            "book_title": request.form['book_title'],
-            "borrow_date": request.form['borrow_date'],
-            "status": request.form['status']
-        }
-
-        borrowed_books_col.update_one({"_id": ObjectId(id)}, {"$set": updated_entry})
-        return redirect("/admin/borrowed-books")
-
-    return render_template("edit_borrowed_book.html", entry=entry)
-
-
-@app.route("/admin/delete-borrowed-book/<id>")
-def delete_borrowed_book(id):
-    borrowed_books_col.delete_one({"_id": ObjectId(id)})
-    return redirect("/admin/borrowed-books")
-
-@app.route('/admin/categories')
-def categories():
-    pipeline = [
-        {"$group": {"_id": "$type", "count": {"$sum": 1}}},
-        {"$sort": {"_id": 1}}
-    ]
-    category_data = list(books_col.aggregate(pipeline))
-    return render_template('categories.html', categories=category_data)
-
-#USER PAGE ROUTES
-
+# ===== BOOK MANAGEMENT ROUTES =====
 @app.route('/user/books')
 def user_books():
     query = request.args.get('q', '')
@@ -396,24 +243,159 @@ def user_books():
     if category:
         filter_query['type'] = category
 
-    books = list(db.books.find(filter_query))
-    categories = db.books.distinct("type")
+    books = list(books_collection.find(filter_query))
+    categories = books_collection.distinct("type")
 
     return render_template('user_books.html', books=books, categories=categories, query=query)
 
-# Support routes
+@app.route('/admin/books')
+def admin_books():
+    if 'user_id' not in session or session['role'] != 'admin':
+        return redirect(url_for('admin_login'))
+    
+    query = request.args.get('q', '')
+    selected_category = request.args.get('category', '')
+
+    categories = books_collection.distinct('type')
+
+    filter_query = {}
+    if query:
+        filter_query['$or'] = [
+            {'title': {'$regex': query, '$options': 'i'}},
+            {'author': {'$regex': query, '$options': 'i'}}
+        ]
+    if selected_category:
+        filter_query['type'] = selected_category
+
+    books = list(books_collection.find(filter_query))
+    return render_template('admin_books.html', books=books, categories=categories)
+
+@app.route('/admin/add-book', methods=['GET', 'POST'])
+def add_book():
+    if 'user_id' not in session or session['role'] != 'admin':
+        return redirect(url_for('admin_login'))
+        
+    if request.method == 'POST':
+        new_book = {
+            'title': request.form['title'],
+            'author': request.form['author'],
+            'type': request.form['type'],
+            'price': float(request.form['price']),
+            'image': request.form['image'],
+            'created_at': datetime.utcnow()
+        }
+        books_collection.insert_one(new_book)
+        flash('Book added successfully!', 'success')
+        return redirect(url_for('admin_books'))
+    return render_template('add_book.html')
+
+@app.route('/admin/edit-book/<book_id>', methods=['GET', 'POST'])
+def edit_book(book_id):
+    if 'user_id' not in session or session['role'] != 'admin':
+        return redirect(url_for('admin_login'))
+        
+    book = books_collection.find_one({'_id': ObjectId(book_id)})
+    if not book:
+        flash('Book not found', 'danger')
+        return redirect(url_for('admin_books'))
+        
+    if request.method == 'POST':
+        updated_book = {
+            'title': request.form['title'],
+            'author': request.form['author'],
+            'type': request.form['type'],
+            'price': float(request.form['price']),
+            'image': request.form['image'],
+            'updated_at': datetime.utcnow()
+        }
+        books_collection.update_one({'_id': ObjectId(book_id)}, {'$set': updated_book})
+        flash('Book updated successfully!', 'success')
+        return redirect(url_for('admin_books'))
+    return render_template('edit_book.html', book=book)
+
+@app.route('/admin/delete-book/<book_id>')
+def delete_book(book_id):
+    if 'user_id' not in session or session['role'] != 'admin':
+        return redirect(url_for('admin_login'))
+        
+    books_collection.delete_one({'_id': ObjectId(book_id)})
+    flash('Book deleted successfully!', 'success')
+    return redirect(url_for('admin_books'))
+
+# ===== BORROWED BOOKS ROUTES =====
+@app.route('/admin/borrowed-books')
+def borrowed_books():
+    if 'user_id' not in session or session['role'] != 'admin':
+        return redirect(url_for('admin_login'))
+        
+    borrowed_books = list(borrowed_books_collection.find())
+    return render_template('borrowed_books.html', borrowed_books=borrowed_books)
+
+@app.route("/admin/add-borrowed-book", methods=["GET", "POST"])
+def add_borrowed_book():
+    if 'user_id' not in session or session['role'] != 'admin':
+        return redirect(url_for('admin_login'))
+        
+    if request.method == "POST":
+        borrowed_books_collection.insert_one({
+            "student_name": request.form['student_name'],
+            "student_id": request.form['student_id'],
+            "year": request.form['year'],
+            "book_title": request.form['book_title'],
+            "borrow_date": request.form['borrow_date'],
+            "status": request.form['status'],
+            "created_at": datetime.utcnow()
+        })
+        flash('Borrowed book added successfully!', 'success')
+        return redirect(url_for('borrowed_books'))
+
+    return render_template("add_borrowed_book.html")
+
+@app.route("/admin/edit-borrowed-book/<id>", methods=["GET", "POST"])
+def edit_borrowed_book(id):
+    if 'user_id' not in session or session['role'] != 'admin':
+        return redirect(url_for('admin_login'))
+        
+    entry = borrowed_books_collection.find_one({"_id": ObjectId(id)})
+    if not entry:
+        flash('Entry not found', 'danger')
+        return redirect(url_for('borrowed_books'))
+
+    if request.method == "POST":
+        updated_entry = {
+            "student_name": request.form['student_name'],
+            "student_id": request.form['student_id'],
+            "year": request.form['year'],
+            "book_title": request.form['book_title'],
+            "borrow_date": request.form['borrow_date'],
+            "status": request.form['status'],
+            "updated_at": datetime.utcnow()
+        }
+        borrowed_books_collection.update_one({"_id": ObjectId(id)}, {"$set": updated_entry})
+        flash('Borrowed book updated successfully!', 'success')
+        return redirect(url_for('borrowed_books'))
+
+    return render_template("edit_borrowed_book.html", entry=entry)
+
+@app.route("/admin/delete-borrowed-book/<id>")
+def delete_borrowed_book(id):
+    if 'user_id' not in session or session['role'] != 'admin':
+        return redirect(url_for('admin_login'))
+        
+    borrowed_books_collection.delete_one({"_id": ObjectId(id)})
+    flash('Borrowed book deleted successfully!', 'success')
+    return redirect(url_for('borrowed_books'))
+
+# ===== SUPPORT TICKET ROUTES =====
 @app.route('/support')
 def user_support():
     if 'user_id' not in session:
         flash('Please login to access support', 'warning')
-        return redirect(url_for('login'))
+        return redirect(url_for('user_login'))
     
-    # Get user's tickets if needed
-    tickets = []
-    if 'user_id' in session:
-        tickets = list(mongo.db.tickets.find({
-            'user_id': ObjectId(session['user_id'])
-        }).sort('created_at', -1))
+    tickets = list(tickets_collection.find({
+        'user_id': ObjectId(session['user_id'])
+    }).sort('created_at', -1))
     
     return render_template('user_support.html', tickets=tickets)
 
@@ -421,7 +403,7 @@ def user_support():
 def submit_ticket():
     if 'user_id' not in session:
         flash('Please login to submit a ticket', 'warning')
-        return redirect(url_for('login'))
+        return redirect(url_for('user_login'))
     
     issue_type = request.form.get('issue_type')
     description = request.form.get('description')
@@ -430,48 +412,26 @@ def submit_ticket():
         flash('Please fill all required fields', 'danger')
         return redirect(url_for('user_support'))
     
-    # Create ticket with timezone-aware datetime
     ticket_data = {
         'user_id': ObjectId(session['user_id']),
         'issue_type': issue_type,
         'description': description,
         'status': 'open',
-        'created_at': datetime.now(timezone.utc),
-        'updated_at': datetime.now(timezone.utc),
-        'resolution': None,
-        'resolved_at': None
+        'created_at': datetime.utcnow(),
+        'resolution': None
     }
     
-    try:
-        mongo.db.tickets.insert_one(ticket_data)
-        flash('Your support ticket has been submitted successfully!', 'success')
-        return redirect(url_for('user_support'))
-    except Exception as e:
-        app.logger.error(f"Ticket submission error: {str(e)}")
-        flash('An error occurred while submitting your ticket', 'danger')
-        return redirect(url_for('user_support'))
+    tickets_collection.insert_one(ticket_data)
+    flash('Support ticket submitted successfully!', 'success')
+    return redirect(url_for('user_support'))
 
-# Admin Support Routes
 @app.route('/admin/support')
 def admin_support():
     if 'user_id' not in session or session.get('role') != 'admin':
         flash('Admin access required', 'danger')
         return redirect(url_for('admin_login'))
     
-    # Get all tickets with user information
-    tickets = list(mongo.db.tickets.aggregate([
-        {
-            '$lookup': {
-                'from': 'users',
-                'localField': 'user_id',
-                'foreignField': '_id',
-                'as': 'user'
-            }
-        },
-        {'$unwind': '$user'},
-        {'$sort': {'created_at': -1}}
-    ]))
-    
+    tickets = list(tickets_collection.find().sort('created_at', -1))
     return render_template('admin_support.html', tickets=tickets)
 
 @app.route('/admin/support/resolve/<ticket_id>', methods=['POST'])
@@ -486,7 +446,7 @@ def resolve_ticket(ticket_id):
         flash('Resolution text is required', 'danger')
         return redirect(url_for('admin_support'))
     
-    mongo.db.tickets.update_one(
+    tickets_collection.update_one(
         {'_id': ObjectId(ticket_id)},
         {'$set': {
             'status': 'resolved',
@@ -498,27 +458,27 @@ def resolve_ticket(ticket_id):
     flash('Ticket resolved successfully', 'success')
     return redirect(url_for('admin_support'))
 
-# Collections
-books_collection = db.books
-users_collection = db.users
-admin_collection = db.admin
-borrowed_books_collection = db.borrowed_books
-tickets_collection = db.tickets
+# ===== CATEGORIES ROUTE =====
+@app.route('/admin/categories')
+def categories():
+    if 'user_id' not in session or session['role'] != 'admin':
+        return redirect(url_for('admin_login'))
+        
+    pipeline = [
+        {"$group": {"_id": "$type", "count": {"$sum": 1}}},
+        {"$sort": {"_id": 1}}
+    ]
+    category_data = list(books_collection.aggregate(pipeline))
+    return render_template('categories.html', categories=category_data)
 
-@app.route('/')
-def home():
-    return redirect(url_for('user_books'))
-
+# ===== LOGOUT ROUTE =====
 @app.route('/logout')
 def logout():
     session.clear()
+    flash('You have been logged out successfully', 'success')
     return redirect(url_for('index'))
 
-    
-# Add this for Vercel deployment
+# Vercel requires this at the bottom
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
-
-if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)

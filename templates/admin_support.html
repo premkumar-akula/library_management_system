@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .footer{
+        position: fixed;
+    }
+</style>
+<div class="container mt-4">
+    <h2 class="mb-4">Support Tickets Management</h2>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    {% if tickets %}
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Ticket ID</th>
+                    <th>User</th>
+                    <th>Issue Type</th>
+                    <th>Status</th>
+                    <th>Submitted</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ticket in tickets %}
+                <tr>
+                    <td>#{{ ticket._id }}</td>
+                    <td>{{ ticket.user.name }}<br><small>{{ ticket.user.email }}</small></td>
+                    <td>{{ ticket.issue_type|replace('_', ' ')|title }}</td>
+                    <td>
+                        <span class="badge bg-{% if ticket.status == 'open' %}warning{% elif ticket.status == 'resolved' %}success{% else %}info{% endif %}">
+                            {{ ticket.status|title }}
+                        </span>
+                    </td>
+                    <td>{{ ticket.created_at.strftime('%b %d, %Y %I:%M %p') }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" 
+                                data-bs-target="#ticketModal{{ loop.index }}">
+                            View
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% for ticket in tickets %}
+    <!-- Modal for each ticket -->
+    <div class="modal fade" id="ticketModal{{ loop.index }}" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        Ticket #{{ ticket._id }} - {{ ticket.user.name }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <h6>Issue Type:</h6>
+                        <p>{{ ticket.issue_type|replace('_', ' ')|title }}</p>
+                    </div>
+                    <div class="mb-3">
+                        <h6>Description:</h6>
+                        <p>{{ ticket.description }}</p>
+                    </div>
+                    <div class="mb-3">
+                        <small class="text-muted">
+                            Submitted on {{ ticket.created_at.strftime('%b %d, %Y at %I:%M %p') }}
+                        </small>
+                    </div>
+                    
+                    {% if ticket.status == 'resolved' %}
+                    <div class="p-3 bg-light rounded">
+                        <h6>Resolution:</h6>
+                        <p>{{ ticket.resolution }}</p>
+                        <small class="text-muted">
+                            Resolved on {{ ticket.resolved_at.strftime('%b %d, %Y at %I:%M %p') }}
+                        </small>
+                    </div>
+                    {% else %}
+                    <form method="POST" action="{{ url_for('resolve_ticket', ticket_id=ticket._id) }}">
+                        <div class="mb-3">
+                            <label for="resolution" class="form-label">Resolution</label>
+                            <textarea class="form-control" id="resolution" name="resolution" rows="4" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success">Mark as Resolved</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    
+    {% else %}
+    <div class="alert alert-info">
+        No support tickets found.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
